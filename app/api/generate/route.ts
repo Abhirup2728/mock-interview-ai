@@ -13,8 +13,7 @@ Ideal Answer: ${body.idealAnswer}
 Candidate's Spoken Answer: ${body.userAnswer}
 
 Return ONLY valid JSON, no extra text:
-{"score": 75, "feedback": "short feedback", "missingPoints": ["point1","point2"]}
-Score 0-100 based on how close the candidate's answer is to the ideal answer in content and completeness. Give short feedback and 2-3 missing points they should add.`;
+{"score": 75, "feedback": "short feedback", "missingPoints": ["point1","point2"]}`;
     const result = await model.generateContent(prompt);
     let text = result.response.text();
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -23,13 +22,16 @@ Score 0-100 based on how close the candidate's answer is to the ideal answer in 
     return NextResponse.json(evalData);
   }
 
-  const { resume, role } = body;
+  const { resume, role, jobDesc } = body;
   const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-  const prompt = `Based on this resume: ${resume}
-For the role: ${role}
+  const prompt = `Resume: ${resume}
+Role: ${role}
+Job Description: ${jobDesc || "not provided"}
+
 Return ONLY valid JSON, no extra text:
-{"items": [{"question":"...","answer":"..."}],"matchScore": 75,"missingKeywords": ["keyword1"],"skillsToImprove": ["skill1"],"suggestions": ["tip1"]}
-Generate 5 questions with answers, match score, 5 missing keywords, 3 skills to improve, 3 suggestions.`;
+{"items": [{"question":"...","answer":"..."}],"matchScore": 75,"missingKeywords": ["k1"],"skillsToImprove": ["s1"],"suggestions": ["tip1"],"jdQuestions": [{"question":"...","answer":"..."}]}
+
+Generate 5 general resume-based questions with answers, match score, 5 missing keywords, 3 skills to improve, 3 suggestions. Also generate 5 jdQuestions specifically based on the job description (skip if no job description given, then jdQuestions can be empty array).`;
   const result = await model.generateContent(prompt);
   let text = result.response.text();
   text = text.replace(/```json/g, "").replace(/```/g, "").trim();

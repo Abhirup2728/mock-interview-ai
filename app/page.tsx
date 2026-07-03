@@ -4,12 +4,15 @@ import { useState, useRef } from "react";
 export default function Home() {
   const [resume, setResume] = useState("");
   const [role, setRole] = useState("");
+  const [jobDesc, setJobDesc] = useState("");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
   const [transcript, setTranscript] = useState("");
   const [listening, setListening] = useState(false);
+  const [evalResult, setEvalResult] = useState<any>(null);
+  const [evaluating, setEvaluating] = useState(false);
   const recognitionRef = useRef<any>(null);
 
   async function handleGenerate() {
@@ -17,7 +20,7 @@ export default function Home() {
     setData(null);
     const res = await fetch("/api/generate", {
       method: "POST",
-      body: JSON.stringify({ resume, role }),
+      body: JSON.stringify({ resume, role, jobDesc }),
     });
     const result = await res.json();
     setData(result);
@@ -50,7 +53,25 @@ export default function Home() {
     setVoiceMode(true);
     setCurrentQ(0);
     setTranscript("");
+    setEvalResult(null);
     if (data?.items?.[0]) speak(data.items[0].question);
+  }
+
+  async function evaluateAnswer() {
+    setEvaluating(true);
+    const q = data.items[currentQ];
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "evaluate",
+        question: q.question,
+        idealAnswer: q.answer,
+        userAnswer: transcript,
+      }),
+    });
+    const result = await res.json();
+    setEvalResult(result);
+    setEvaluating(false);
   }
 
   function nextQuestion() {
@@ -58,6 +79,7 @@ export default function Home() {
     if (data?.items?.[next]) {
       setCurrentQ(next);
       setTranscript("");
+      setEvalResult(null);
       speak(data.items[next].question);
     } else {
       setVoiceMode(false);
@@ -68,7 +90,7 @@ export default function Home() {
   return (
     <div style={{ minHeight: "100vh", background: "#0f172a", padding: "20px" }}>
       <div style={{ maxWidth: 800, margin: "0 auto", fontFamily: "sans-serif" }}>
-        
+
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ fontSize: 28 }}>🎯</div>
@@ -91,6 +113,13 @@ export default function Home() {
                 placeholder="Target job role"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
+                style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #334155", background: "#0f172a", color: "#fff", marginBottom: 12 }}
+              />
+              <textarea
+                placeholder="Paste full job description here (optional but recommended)"
+                value={jobDesc}
+                onChange={(e) => setJobDesc(e.target.value)}
+                rows={4}
                 style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #334155", background: "#0f172a", color: "#fff", marginBottom: 12 }}
               />
               <button onClick={handleGenerate} disabled={loading} style={{ width: "100%", padding: 12, borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
@@ -144,6 +173,18 @@ export default function Home() {
                 <p style={{ color: "#e2e8f0" }}>{item.answer}</p>
               </div>
             ))}
+
+            {data?.jdQuestions?.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <h2 style={{ color: "#fbbf24", fontSize: 18, marginBottom: 12 }}>📌 Probable Questions Based on Job Description</h2>
+                {data.jdQuestions.map((item: any, i: number) => (
+                  <div key={i} style={{ background: "#1e293b", padding: 16, borderRadius: 12, marginBottom: 12, border: "1px solid #fbbf24" }}>
+                    <p style={{ color: "#fbbf24", fontWeight: 600, marginBottom: 8 }}>Q{i + 1}: {item.question}</p>
+                    <p style={{ color: "#e2e8f0" }}>{item.answer}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
@@ -151,7 +192,7 @@ export default function Home() {
           <div style={{ background: "#1e293b", padding: 30, borderRadius: 12, textAlign: "center" }}>
             <p style={{ color: "#64748b", marginBottom: 8 }}>Question {currentQ + 1} of {data.items.length}</p>
             <p style={{ color: "#fff", fontSize: 20, fontWeight: 600, marginBottom: 20 }}>{data.items[currentQ].question}</p>
-            
+
             <button onClick={startListening} style={{ padding: "14px 28px", borderRadius: 50, border: "none", background: listening ? "#dc2626" : "#6366f1", color: "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 20 }}>
               {listening ? "🔴 Listening..." : "🎙️ Tap to Answer"}
             </button>
@@ -160,6 +201,24 @@ export default function Home() {
               <div style={{ background: "#0f172a", padding: 16, borderRadius: 8, marginBottom: 20, textAlign: "left" }}>
                 <p style={{ color: "#64748b", fontSize: 13, marginBottom: 6 }}>Your Answer:</p>
                 <p style={{ color: "#e2e8f0" }}>{transcript}</p>
+                <button onClick={evaluateAnswer} disabled={evaluating} style={{ marginTop: 12, padding: "8px 16px", borderRadius: 8, border: "none", background: "#f59e0b", color: "#000", fontWeight: 600, cursor: "pointer" }}>
+                  {evaluating ? "Evaluating..." : "✓ Evaluate My Answer"}
+                </button>
+              </div>
+            )}
+
+            {evalResult?.score !== undefined && (
+              <div style={{ background: "#0f172a", padding: 16, borderRadius: 8, marginBottom: 20, textAlign: "left", border: "1px solid #f59e0b" }}>
+                <p style={{ color: "#f59e0b", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Answer Score: {evalResult.score}%</p>
+                <p style={{ color: "#e2e8f0", marginBottom: 10 }}>{evalResult.feedback}</p>
+                {evalResult.missingPoints?.length > 0 && (
+                  <>
+                    <p style={{ color: "#fbbf24", fontWeight: 600, marginBottom: 6 }}>You should also mention:</p>
+                    {evalResult.missingPoints.map((p: string, i: number) => (
+                      <p key={i} style={{ color: "#cbd5e1", fontSize: 14 }}>• {p}</p>
+                    ))}
+                  </>
+                )}
               </div>
             )}
 
