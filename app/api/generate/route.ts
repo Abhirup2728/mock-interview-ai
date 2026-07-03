@@ -10,19 +10,26 @@ export async function POST(req: Request) {
   const prompt = `Based on this resume: ${resume}
 For the role: ${role}
 
-Generate 5 interview questions specific to this resume, each with a strong sample answer the candidate can say. Reply ONLY in this exact JSON format, no extra text:
-[{"question":"...","answer":"..."}]`;
+Return ONLY valid JSON, no extra text, in this exact format:
+{
+  "items": [{"question":"...","answer":"..."}],
+  "matchScore": 75,
+  "missingKeywords": ["keyword1","keyword2"],
+  "skillsToImprove": ["skill1","skill2"],
+  "suggestions": ["tip1","tip2"]
+}
+Generate 5 questions with answers, a match score (0-100) for how well resume fits the role, 5 missing keywords recruiters look for, 3 skills to improve, and 3 suggestions to crack this role.`;
 
   const result = await model.generateContent(prompt);
   let text = result.response.text();
   text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
-  let items = [];
+  let data = {};
   try {
-    items = JSON.parse(text);
+    data = JSON.parse(text);
   } catch {
-    items = [];
+    data = {};
   }
 
-  return NextResponse.json({ items });
+  return NextResponse.json(data);
 }
