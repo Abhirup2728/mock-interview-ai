@@ -1,11 +1,16 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export default function Home() {
   const [resume, setResume] = useState("");
   const [role, setRole] = useState("");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [currentQ, setCurrentQ] = useState(0);
+  const [transcript, setTranscript] = useState("");
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   async function handleGenerate() {
     setLoading(true);
@@ -17,6 +22,47 @@ export default function Home() {
     const result = await res.json();
     setData(result);
     setLoading(false);
+  }
+
+  function speak(text: string) {
+    const utter = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(utter);
+  }
+
+  function startListening() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice not supported in this browser. Use Chrome.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.onresult = (e: any) => {
+      setTranscript(e.results[0][0].transcript);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.start();
+    recognitionRef.current = recognition;
+    setListening(true);
+  }
+
+  function startVoiceInterview() {
+    setVoiceMode(true);
+    setCurrentQ(0);
+    setTranscript("");
+    if (data?.items?.[0]) speak(data.items[0].question);
+  }
+
+  function nextQuestion() {
+    const next = currentQ + 1;
+    if (data?.items?.[next]) {
+      setCurrentQ(next);
+      setTranscript("");
+      speak(data.items[next].question);
+    } else {
+      setVoiceMode(false);
+      alert("Interview complete!");
+    }
   }
 
   return (
@@ -31,74 +77,104 @@ export default function Home() {
           <p style={{ color: "#64748b", fontSize: 13, margin: 0 }}>Developed by - Abhirup Gumtya</p>
         </div>
 
-        <p style={{ color: "#94a3b8", marginBottom: 24 }}>Paste your resume, get real interview Q&A + resume analysis</p>
+        {!voiceMode && (
+          <>
+            <div style={{ background: "#1e293b", padding: 20, borderRadius: 12, marginBottom: 20 }}>
+              <textarea
+                placeholder="Paste your resume text here"
+                value={resume}
+                onChange={(e) => setResume(e.target.value)}
+                rows={6}
+                style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #334155", background: "#0f172a", color: "#fff", marginBottom: 12 }}
+              />
+              <input
+                placeholder="Target job role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #334155", background: "#0f172a", color: "#fff", marginBottom: 12 }}
+              />
+              <button onClick={handleGenerate} disabled={loading} style={{ width: "100%", padding: 12, borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+                {loading ? "Analyzing..." : "Generate Questions & Answers"}
+              </button>
+            </div>
 
-        <div style={{ background: "#1e293b", padding: 20, borderRadius: 12, marginBottom: 20 }}>
-          <textarea
-            placeholder="Paste your resume text here"
-            value={resume}
-            onChange={(e) => setResume(e.target.value)}
-            rows={6}
-            style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #334155", background: "#0f172a", color: "#fff", marginBottom: 12 }}
-          />
-          <input
-            placeholder="Target job role (e.g. Frontend Developer)"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #334155", background: "#0f172a", color: "#fff", marginBottom: 12 }}
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            style={{ width: "100%", padding: 12, borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontWeight: 600, cursor: "pointer" }}
-          >
-            {loading ? "Analyzing..." : "Generate Questions & Answers"}
-          </button>
-        </div>
-
-        {data && data.matchScore !== undefined && (
-          <div style={{ background: "#1e293b", padding: 20, borderRadius: 12, marginBottom: 20 }}>
-            <p style={{ color: "#818cf8", fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Resume Match Score: {data.matchScore}%</p>
-
-            {data.missingKeywords && (
-              <div style={{ marginBottom: 16 }}>
-                <p style={{ color: "#fbbf24", fontWeight: 600, marginBottom: 6 }}>Missing Keywords</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {data.missingKeywords.map((k: string, i: number) => (
-                    <span key={i} style={{ background: "#422006", color: "#fbbf24", padding: "4px 10px", borderRadius: 20, fontSize: 13 }}>{k}</span>
-                  ))}
-                </div>
+            {data?.matchScore !== undefined && (
+              <div style={{ background: "#1e293b", padding: 20, borderRadius: 12, marginBottom: 20 }}>
+                <p style={{ color: "#818cf8", fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Resume Match Score: {data.matchScore}%</p>
+                {data.missingKeywords && (
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ color: "#fbbf24", fontWeight: 600, marginBottom: 6 }}>Missing Keywords</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {data.missingKeywords.map((k: string, i: number) => (
+                        <span key={i} style={{ background: "#422006", color: "#fbbf24", padding: "4px 10px", borderRadius: 20, fontSize: 13 }}>{k}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {data.skillsToImprove && (
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ color: "#f87171", fontWeight: 600, marginBottom: 6 }}>Skills to Improve</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {data.skillsToImprove.map((k: string, i: number) => (
+                        <span key={i} style={{ background: "#450a0a", color: "#f87171", padding: "4px 10px", borderRadius: 20, fontSize: 13 }}>{k}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {data.suggestions && (
+                  <div>
+                    <p style={{ color: "#4ade80", fontWeight: 600, marginBottom: 6 }}>Suggestions to Crack This Role</p>
+                    {data.suggestions.map((s: string, i: number) => (
+                      <p key={i} style={{ color: "#e2e8f0", fontSize: 14, marginBottom: 4 }}>✓ {s}</p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
-            {data.skillsToImprove && (
-              <div style={{ marginBottom: 16 }}>
-                <p style={{ color: "#f87171", fontWeight: 600, marginBottom: 6 }}>Skills to Improve</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {data.skillsToImprove.map((k: string, i: number) => (
-                    <span key={i} style={{ background: "#450a0a", color: "#f87171", padding: "4px 10px", borderRadius: 20, fontSize: 13 }}>{k}</span>
-                  ))}
-                </div>
-              </div>
+            {data?.items?.length > 0 && (
+              <button onClick={startVoiceInterview} style={{ width: "100%", padding: 14, borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 20 }}>
+                🎤 Start Voice Mock Interview
+              </button>
             )}
 
-            {data.suggestions && (
-              <div>
-                <p style={{ color: "#4ade80", fontWeight: 600, marginBottom: 6 }}>Suggestions to Crack This Role</p>
-                {data.suggestions.map((s: string, i: number) => (
-                  <p key={i} style={{ color: "#e2e8f0", fontSize: 14, marginBottom: 4 }}>✓ {s}</p>
-                ))}
+            {data?.items?.map((item: any, i: number) => (
+              <div key={i} style={{ background: "#1e293b", padding: 16, borderRadius: 12, marginBottom: 12 }}>
+                <p style={{ color: "#818cf8", fontWeight: 600, marginBottom: 8 }}>Q{i + 1}: {item.question}</p>
+                <p style={{ color: "#e2e8f0" }}>{item.answer}</p>
               </div>
-            )}
-          </div>
+            ))}
+          </>
         )}
 
-        {data && data.items && data.items.map((item: any, i: number) => (
-          <div key={i} style={{ background: "#1e293b", padding: 16, borderRadius: 12, marginBottom: 12 }}>
-            <p style={{ color: "#818cf8", fontWeight: 600, marginBottom: 8 }}>Q{i + 1}: {item.question}</p>
-            <p style={{ color: "#e2e8f0" }}>{item.answer}</p>
+        {voiceMode && data?.items?.[currentQ] && (
+          <div style={{ background: "#1e293b", padding: 30, borderRadius: 12, textAlign: "center" }}>
+            <p style={{ color: "#64748b", marginBottom: 8 }}>Question {currentQ + 1} of {data.items.length}</p>
+            <p style={{ color: "#fff", fontSize: 20, fontWeight: 600, marginBottom: 20 }}>{data.items[currentQ].question}</p>
+            
+            <button onClick={startListening} style={{ padding: "14px 28px", borderRadius: 50, border: "none", background: listening ? "#dc2626" : "#6366f1", color: "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 20 }}>
+              {listening ? "🔴 Listening..." : "🎙️ Tap to Answer"}
+            </button>
+
+            {transcript && (
+              <div style={{ background: "#0f172a", padding: 16, borderRadius: 8, marginBottom: 20, textAlign: "left" }}>
+                <p style={{ color: "#64748b", fontSize: 13, marginBottom: 6 }}>Your Answer:</p>
+                <p style={{ color: "#e2e8f0" }}>{transcript}</p>
+              </div>
+            )}
+
+            {data.items[currentQ].answer && (
+              <div style={{ background: "#0f172a", padding: 16, borderRadius: 8, marginBottom: 20, textAlign: "left" }}>
+                <p style={{ color: "#4ade80", fontSize: 13, marginBottom: 6 }}>Ideal Answer:</p>
+                <p style={{ color: "#e2e8f0" }}>{data.items[currentQ].answer}</p>
+              </div>
+            )}
+
+            <button onClick={nextQuestion} style={{ padding: "12px 24px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+              Next Question →
+            </button>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
