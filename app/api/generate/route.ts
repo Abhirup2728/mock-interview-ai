@@ -7,10 +7,22 @@ export async function POST(req: Request) {
   const { resume, role } = await req.json();
   const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
-  const prompt = `You are an interviewer. Based on this resume: ${resume} for the role: ${role}, generate 5 interview questions.`;
+  const prompt = `Based on this resume: ${resume}
+For the role: ${role}
+
+Generate 5 interview questions specific to this resume, each with a strong sample answer the candidate can say. Reply ONLY in this exact JSON format, no extra text:
+[{"question":"...","answer":"..."}]`;
 
   const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  let text = result.response.text();
+  text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
-  return NextResponse.json({ questions: text });
+  let items = [];
+  try {
+    items = JSON.parse(text);
+  } catch {
+    items = [];
+  }
+
+  return NextResponse.json({ items });
 }
