@@ -82,7 +82,7 @@ This project reflects my ability to independently design, build, and ship a **fu
 ## 👤 Author
  
 **Abhirup Gumtya**
-B.Tech CSE (AI & ML) | Brainware University, Kolkata
+B.Tech (CSE)
  
 - 🔗 LinkedIn: [linkedin.com/in/abhirupgumtya](https://linkedin.com/in/abhirupgumtya)
 - 💻 GitHub: [github.com/Abhirup2728](https://github.com/Abhirup2728)
